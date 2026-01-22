@@ -1,7 +1,7 @@
 # MileSync - Task Tracking
 
 ## Current Phase
-**Phase 2: Core Features Development**
+**Phase 3: Observability & Evaluation**
 
 ## Active Tasks
 
@@ -59,6 +59,21 @@
   - [x] Dashboard stats tests
   - [x] Milestone CRUD tests
   - [x] Task CRUD tests
+- [x] **Opik LLM Observability & Evaluation Integration**
+  - [x] Opik SDK installation and configuration
+  - [x] OpenAI client wrapped with track_openai for automatic tracing
+  - [x] @track decorators on AI service functions (chat, summarize, extract)
+  - [x] Custom LLM-as-judge metrics:
+    - [x] GoalCoachingQualityMetric (SMART alignment, motivational quality)
+    - [x] GoalExtractionQualityMetric (extraction completeness, quality)
+    - [x] UserFrustrationDetector (conversation friction detection)
+  - [x] Analytics API endpoints (/api/analytics/*)
+  - [x] Frontend Analytics dashboard with performance visualizations
+  - [x] Automatic evaluation logging in chat and finalize endpoints
+  - [x] Experiment runner script for batch evaluation
+  - [x] Evaluation datasets for testing
+  - [x] Unit tests for Opik integration
+  - [x] OPIK_INTEGRATION.md documentation
 
 ## Discovered Items
 _Items discovered during development that need attention_
@@ -77,3 +92,6 @@ _Issues blocking progress_
 - Update this file as tasks progress
 - Add discovered items when found during development
 - OpenAI API key required in .env for AI chat and goal extraction functionality
+- **Opik API key required in .env for LLM observability and evaluation**
+- See `backend/OPIK_INTEGRATION.md` for Opik setup instructions
+

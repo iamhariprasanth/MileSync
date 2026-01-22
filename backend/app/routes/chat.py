@@ -1,5 +1,10 @@
-"""Chat routes for AI coaching conversations."""
+"""Chat routes for AI coaching conversations.
 
+Integrated with Opik for automatic evaluation and observability.
+"""
+
+import logging
+import uuid
 from datetime import datetime
 from typing import List, Union
 
@@ -22,7 +27,10 @@ from app.schemas.chat import (
 )
 from app.schemas.goal import FinalizeWithGoalResponse, GoalResponse
 from app.services import ai_service, goal_service
+from app.services.quota_service import check_user_quota, track_openai_usage
 from app.utils.dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -210,9 +218,17 @@ async def send_message(
         for m in messages
     ]
 
-    # Generate AI response
+    # Generate AI response with quota tracking
     try:
-        ai_response = await ai_service.generate_chat_response(message_history)
+        # Check quota before making API call
+        check_user_quota(db, current_user.id)
+        
+        ai_response, token_usage = await ai_service.generate_chat_response_with_usage(message_history)
+        
+        # Track token usage from OpenAI response
+        if token_usage:
+            usage_info = track_openai_usage(db, current_user.id, token_usage)
+            logger.info(f"User {current_user.id} token usage: {usage_info.get('tokens_used_this_call', 0)} tokens")
     except ValueError as e:
         # Reason: Fallback for when OpenAI not configured (development mode)
         ai_response = (
@@ -220,6 +236,9 @@ async def send_message(
             "The AI service is not configured. Please contact support."
         )
     except Exception as e:
+        # Re-raise quota exceeded errors (429)
+        if hasattr(e, 'status_code') and e.status_code == 429:
+            raise
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="AI service temporarily unavailable",
@@ -238,6 +257,26 @@ async def send_message(
     db.add(session)
     db.commit()
     db.refresh(assistant_message)
+
+    # Log evaluation to Opik (async, non-blocking)
+    try:
+        from app.services.opik_service import log_chat_evaluation, is_opik_enabled
+        if is_opik_enabled():
+            trace_id = str(uuid.uuid4())
+            evaluation_result = log_chat_evaluation(
+                trace_id=trace_id,
+                user_input=data.content,
+                ai_response=ai_response,
+                session_id=session_id,
+                user_id=current_user.id,
+            )
+            if evaluation_result:
+                logger.info(
+                    f"Chat evaluation logged - Score: {evaluation_result.get('score', 'N/A')}"
+                )
+    except Exception as e:
+        # Non-blocking - don't fail the request if logging fails
+        logger.warning(f"Failed to log chat evaluation: {e}")
 
     return SendMessageResponse(
         user_message=MessageResponse.model_validate(user_message),
@@ -326,6 +365,36 @@ async def finalize_session(
     db.add(session)
     db.commit()
     db.refresh(session)
+
+    # Log goal extraction evaluation to Opik
+    try:
+        from app.services.opik_service import log_goal_extraction_evaluation, is_opik_enabled
+        if is_opik_enabled():
+            trace_id = str(uuid.uuid4())
+            
+            # Convert goal_data to dict for logging
+            goal_dict = {
+                "title": goal_data.title,
+                "description": goal_data.description,
+                "category": goal_data.category,
+                "milestones": [
+                    {"title": m.title, "tasks": len(m.tasks)} 
+                    for m in goal_data.milestones
+                ]
+            }
+            
+            extraction_result = log_goal_extraction_evaluation(
+                trace_id=trace_id,
+                conversation=message_history,
+                goal_data=goal_dict,
+                user_id=current_user.id,
+            )
+            if extraction_result:
+                logger.info(
+                    f"Goal extraction logged - Score: {extraction_result.get('score', 'N/A')}"
+                )
+    except Exception as e:
+        logger.warning(f"Failed to log goal extraction evaluation: {e}")
 
     return FinalizeWithGoalResponse(
         goal=GoalResponse.model_validate(goal),

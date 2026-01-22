@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str = ""
 
+    # Opik - LLM Observability & Evaluation
+    OPIK_API_KEY: str = ""
+    OPIK_WORKSPACE: str = ""
+    OPIK_PROJECT_NAME: str = "MileSync-AI-Coach"
+    
+    # Token Quota Settings
+    DEFAULT_USER_QUOTA: int = 100000  # Default tokens per user per period
+    QUOTA_RESET_DAYS: int = 30  # Days until quota resets
+
     # Frontend URL (for CORS and redirects)
     FRONTEND_URL: str = "http://localhost:3000"
 

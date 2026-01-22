@@ -1,12 +1,30 @@
-"""AI service for OpenAI chat completions and goal extraction."""
+"""AI service for OpenAI chat completions and goal extraction.
+
+Integrated with Opik for comprehensive LLM observability and evaluation.
+"""
 
 import json
+import uuid
 from typing import List, Optional
 
 from openai import OpenAI
 
 from app.config import settings
 from app.schemas.goal import AIGoalGeneration, AIMilestoneGeneration, AITaskGeneration
+
+# Opik integration imports
+try:
+    from opik import track
+    from opik.integrations.openai import track_openai
+    OPIK_AVAILABLE = True
+except ImportError:
+    OPIK_AVAILABLE = False
+    # Create a no-op decorator if Opik is not available
+    def track(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator if not args else args[0]
+    track_openai = lambda x: x
 
 # Default model for all AI conversations
 AI_MODEL = "gpt-4o-mini"
@@ -25,17 +43,31 @@ Guidelines:
 
 Keep responses concise but helpful. Use a friendly, supportive tone."""
 
+# Global tracked client - initialized once
+_tracked_client = None
+
 
 def get_openai_client() -> Optional[OpenAI]:
     """
-    Get OpenAI client instance.
+    Get OpenAI client instance wrapped with Opik tracing.
 
     Returns:
         OpenAI client if API key is configured, None otherwise
     """
+    global _tracked_client
+    
     if not settings.OPENAI_API_KEY:
         return None
-    return OpenAI(api_key=settings.OPENAI_API_KEY)
+    
+    if _tracked_client is None:
+        base_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        # Wrap with Opik tracking if available
+        if OPIK_AVAILABLE and settings.OPIK_API_KEY:
+            _tracked_client = track_openai(base_client)
+        else:
+            _tracked_client = base_client
+    
+    return _tracked_client
 
 
 def format_messages_for_openai(
@@ -69,6 +101,7 @@ def format_messages_for_openai(
     return formatted
 
 
+@track(name="generate_chat_response", tags=["chat", "ai-coaching"])
 async def generate_chat_response(
     messages: List[dict],
     model: str = AI_MODEL
@@ -104,6 +137,51 @@ async def generate_chat_response(
     return response.choices[0].message.content or ""
 
 
+@track(name="generate_chat_response_with_usage", tags=["chat", "ai-coaching", "quota"])
+async def generate_chat_response_with_usage(
+    messages: List[dict],
+    model: str = AI_MODEL
+) -> tuple:
+    """
+    Generate AI response and return token usage for quota tracking.
+
+    Args:
+        messages: List of message dicts with 'role' and 'content'
+        model: OpenAI model to use
+
+    Returns:
+        Tuple of (response_text, usage_dict)
+        usage_dict contains: total_tokens, prompt_tokens, completion_tokens
+
+    Raises:
+        ValueError: If OpenAI API key is not configured
+    """
+    client = get_openai_client()
+
+    if not client:
+        raise ValueError("OpenAI API key not configured")
+
+    formatted_messages = format_messages_for_openai(messages)
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=formatted_messages,
+        max_tokens=1000,
+        temperature=0.7,
+    )
+
+    # Extract usage information
+    usage = None
+    if response.usage:
+        usage = {
+            "total_tokens": response.usage.total_tokens,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens
+        }
+
+    return response.choices[0].message.content or "", usage
+
+
 def generate_initial_message() -> str:
     """
     Generate the initial greeting message for a new chat session.
@@ -118,6 +196,7 @@ def generate_initial_message() -> str:
     )
 
 
+@track(name="summarize_conversation", tags=["summarization"])
 async def summarize_conversation(messages: List[dict]) -> str:
     """
     Generate a summary/title for a conversation.
@@ -234,6 +313,7 @@ GOAL_EXTRACTION_TOOL = {
 }
 
 
+@track(name="extract_goal_from_conversation", tags=["goal-extraction", "function-calling"])
 async def extract_goal_from_conversation(messages: List[dict]) -> Optional[AIGoalGeneration]:
     """
     Extract structured goal data from a conversation using OpenAI function calling.

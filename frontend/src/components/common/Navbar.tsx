@@ -11,8 +11,9 @@ export default function Navbar() {
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/chat', label: 'New Goal' },
     { path: '/goals', label: 'My Goals' },
-    { path: '/chat/history', label: 'Chat History' },
-    { path: '/profile', label: 'Profile' },
+    { path: '/checkin', label: 'Check-in' },
+    { path: '/insights', label: 'Insights' },
+    { path: '/analytics', label: 'Analytics' },
   ];
 
   return (
@@ -32,11 +33,10 @@ export default function Navbar() {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive(link.path)
-                    ? 'text-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
-                }`}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActive(link.path)
+                  ? 'text-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50'
+                  }`}
               >
                 {link.label}
               </Link>

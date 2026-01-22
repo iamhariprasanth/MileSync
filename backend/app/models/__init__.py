@@ -3,6 +3,22 @@
 
 from app.models.user import User
 from app.models.chat import ChatSession, ChatMessage
-from app.models.goal import Goal, Milestone, Task
+from app.models.goal import Goal, Milestone, Task, GoalType, TaskFrequency
+from app.models.user_profile import UserProfile
+from app.models.sustainability import HabitLoop, UserInsight, DailyProgress
 
-__all__ = ["User", "ChatSession", "ChatMessage", "Goal", "Milestone", "Task"]
+__all__ = [
+    "User",
+    "ChatSession",
+    "ChatMessage",
+    "Goal",
+    "Milestone",
+    "Task",
+    "GoalType",
+    "TaskFrequency",
+    "UserProfile",
+    "HabitLoop",
+    "UserInsight",
+    "DailyProgress",
+]
+

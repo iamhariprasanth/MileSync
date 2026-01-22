@@ -12,6 +12,9 @@ import Goals from './pages/Goals';
 import GoalDetail from './pages/GoalDetail';
 import OAuthCallback from './pages/OAuthCallback';
 import Profile from './pages/Profile';
+import Analytics from './pages/Analytics';
+import DailyCheckin from './pages/DailyCheckin';
+import Insights from './pages/Insights';
 
 // Components
 import Navbar from './components/common/Navbar';
@@ -95,6 +98,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/checkin"
+            element={
+              <ProtectedRoute>
+                <DailyCheckin />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/insights"
+            element={
+              <ProtectedRoute>
+                <Insights />
               </ProtectedRoute>
             }
           />

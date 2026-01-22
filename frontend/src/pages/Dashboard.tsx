@@ -128,6 +128,16 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-600">Track progress on existing goals</p>
               </div>
             </Link>
+            <Link
+              to="/analytics"
+              className="flex items-center p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
+            >
+              <span className="text-2xl mr-4">📊</span>
+              <div>
+                <p className="font-medium text-gray-900">AI Analytics</p>
+                <p className="text-sm text-gray-600">View coaching quality & performance metrics</p>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
@@ -201,7 +211,7 @@ function TaskItem({
       <input
         type="checkbox"
         className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-        onChange={() => {}}
+        onChange={() => { }}
       />
       <div className="ml-3 flex-1">
         <p className="text-sm font-medium text-gray-900">{task.title}</p>

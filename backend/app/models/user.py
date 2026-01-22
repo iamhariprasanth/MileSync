@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
+from app.config import settings
 
 
 class AuthProvider(str, Enum):
@@ -28,7 +29,30 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Token quota fields for OpenAI usage limits
+    token_limit: int = Field(default_factory=lambda: settings.DEFAULT_USER_QUOTA)
+    tokens_used: int = Field(default=0)
+    quota_reset_at: Optional[datetime] = Field(default=None)
 
     class Config:
         """Pydantic config."""
         use_enum_values = True
+
+    def reset_quota_if_needed(self) -> bool:
+        """Reset tokens_used if quota_reset_at has passed. Returns True if reset."""
+        if self.quota_reset_at and datetime.utcnow() >= self.quota_reset_at:
+            self.tokens_used = 0
+            self.quota_reset_at = None
+            return True
+        return False
+    
+    def has_quota_remaining(self, required_tokens: int = 0) -> bool:
+        """Check if user has quota remaining."""
+        self.reset_quota_if_needed()
+        return self.tokens_used + required_tokens <= self.token_limit
+    
+    def remaining_quota(self) -> int:
+        """Get remaining token quota."""
+        self.reset_quota_if_needed()
+        return max(0, self.token_limit - self.tokens_used)
