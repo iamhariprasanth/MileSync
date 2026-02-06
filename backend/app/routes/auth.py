@@ -14,7 +14,7 @@ from app.schemas.user import (
     UserResponse,
     UserUpdate,
 )
-from app.services import auth_service, oauth_service
+from app.services import auth_service
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -89,105 +89,4 @@ async def update_current_user_info(
     return UserResponse.model_validate(updated_user)
 
 
-# ===================
-# Google OAuth
-# ===================
 
-
-@router.get("/google")
-async def google_auth():
-    """Redirect to Google OAuth authorization page."""
-    if not settings.GOOGLE_CLIENT_ID:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="Google OAuth not configured",
-        )
-    auth_url = oauth_service.get_google_auth_url()
-    return RedirectResponse(url=auth_url)
-
-
-@router.get("/google/callback")
-async def google_callback(code: str, db: Session = Depends(get_db)):
-    """
-    Handle Google OAuth callback.
-
-    Creates or retrieves user and redirects to frontend with token.
-    """
-    user_info = await oauth_service.get_google_user_info(code)
-    if not user_info or not user_info.get("email"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to get user info from Google",
-        )
-
-    # Check if user exists
-    user = auth_service.get_user_by_email(db, user_info["email"])
-
-    if not user:
-        # Create new user
-        user = auth_service.create_oauth_user(
-            db,
-            email=user_info["email"],
-            name=user_info["name"],
-            provider=AuthProvider.GOOGLE,
-            avatar_url=user_info.get("avatar_url"),
-        )
-
-    # Generate token
-    access_token = auth_service.create_access_token(user.id)
-
-    # Redirect to frontend with token
-    redirect_url = f"{settings.FRONTEND_URL}/oauth/callback?token={access_token}"
-    return RedirectResponse(url=redirect_url)
-
-
-# ===================
-# GitHub OAuth
-# ===================
-
-
-@router.get("/github")
-async def github_auth():
-    """Redirect to GitHub OAuth authorization page."""
-    if not settings.GITHUB_CLIENT_ID:
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="GitHub OAuth not configured",
-        )
-    auth_url = oauth_service.get_github_auth_url()
-    return RedirectResponse(url=auth_url)
-
-
-@router.get("/github/callback")
-async def github_callback(code: str, db: Session = Depends(get_db)):
-    """
-    Handle GitHub OAuth callback.
-
-    Creates or retrieves user and redirects to frontend with token.
-    """
-    user_info = await oauth_service.get_github_user_info(code)
-    if not user_info or not user_info.get("email"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to get user info from GitHub",
-        )
-
-    # Check if user exists
-    user = auth_service.get_user_by_email(db, user_info["email"])
-
-    if not user:
-        # Create new user
-        user = auth_service.create_oauth_user(
-            db,
-            email=user_info["email"],
-            name=user_info["name"],
-            provider=AuthProvider.GITHUB,
-            avatar_url=user_info.get("avatar_url"),
-        )
-
-    # Generate token
-    access_token = auth_service.create_access_token(user.id)
-
-    # Redirect to frontend with token
-    redirect_url = f"{settings.FRONTEND_URL}/oauth/callback?token={access_token}"
-    return RedirectResponse(url=redirect_url)

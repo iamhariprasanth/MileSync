@@ -443,35 +443,48 @@ def _calculate_streak(db: Session, user_id: int) -> int:
     """
     from datetime import timedelta
 
+    # Get all completion dates for the user
+    # join with Goal to ensure user ownership
+    results = db.exec(
+        select(Task.completed_at)
+        .join(Goal, Task.goal_id == Goal.id)
+        .where(
+            Goal.user_id == user_id,
+            Task.status == TaskStatus.COMPLETED,
+            Task.completed_at != None
+        )
+    ).all()
+
+    if not results:
+        return 0
+
+    # Convert to set of dates
+    completed_dates = {dt.date() for dt in results if dt}
+
     today = date.today()
     streak = 0
     current_date = today
 
-    while True:
-        # Check if any task was completed on current_date
-        start_of_day = datetime.combine(current_date, datetime.min.time())
-        end_of_day = datetime.combine(current_date, datetime.max.time())
-
-        completed_on_date = db.exec(
-            select(func.count(Task.id))
-            .join(Goal, Task.goal_id == Goal.id)
-            .where(
-                Goal.user_id == user_id,
-                Task.completed_at >= start_of_day,
-                Task.completed_at <= end_of_day,
-            )
-        ).one()
-
-        if completed_on_date > 0:
+    # Logic:
+    # 1. Check if we have a streak continuing from today or yesterday
+    # If today is completed, streak starts including today.
+    # If today is NOT completed, but yesterday IS, streak starts from yesterday.
+    # If neither, streak is 0.
+    
+    # Check today
+    if current_date in completed_dates:
+        streak += 1
+        current_date -= timedelta(days=1)
+        # Continue checking previous days
+        while current_date in completed_dates:
             streak += 1
             current_date -= timedelta(days=1)
-        else:
-            # Reason: If today has no completions, don't break streak yet
-            # (user might complete something later today)
-            if current_date == today:
-                current_date -= timedelta(days=1)
-            else:
-                break
+    else:
+        # Check yesterday
+        current_date -= timedelta(days=1)
+        while current_date in completed_dates:
+            streak += 1
+            current_date -= timedelta(days=1)
 
     return streak
 
@@ -488,34 +501,52 @@ def _get_upcoming_tasks(db: Session, user_id: int, limit: int = 5) -> List[Upcom
     Returns:
         List of upcoming tasks with goal information
     """
-    # Get pending tasks from active goals, prioritized by priority and due date
-    tasks_with_goals = db.exec(
-        select(Task, Goal)
-        .join(Goal, Task.goal_id == Goal.id)
-        .where(
-            Goal.user_id == user_id,
-            Goal.status == GoalStatus.ACTIVE,
-            Task.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
-        )
-        .order_by(
-            # High priority first
-            Task.priority.desc(),
-            # Due date (nulls last)
-            Task.due_date.asc().nulls_last(),
-        )
-        .limit(limit)
-    ).all()
+    # 1. Get IDs of active goals for this user
+    goal_stmt = select(Goal.id, Goal.title).where(
+        Goal.user_id == user_id,
+        Goal.status == GoalStatus.ACTIVE
+    )
+    active_goals_rows = db.exec(goal_stmt).all()
+    
+    if not active_goals_rows:
+        return []
+        
+    active_goal_ids = [row[0] for row in active_goals_rows]
+    goal_titles = {row[0]: row[1] for row in active_goals_rows}
+
+    # 2. Get pending/in_progress tasks for these goals
+    # We fetch all candidates and sort in Python to avoid complex SQL sorting with Enums/Nulls
+    task_stmt = select(Task).where(
+        Task.goal_id.in_(active_goal_ids),
+        (Task.status == TaskStatus.PENDING) | (Task.status == TaskStatus.IN_PROGRESS)
+    )
+    tasks = db.exec(task_stmt).all()
+
+    # Sort in Python: High priority first, then due date (earliest first, None last)
+    priority_map = {
+        TaskPriority.HIGH: 0,
+        TaskPriority.MEDIUM: 1,
+        TaskPriority.LOW: 2
+    }
+    
+    def task_sort_key(t):
+        prio_score = priority_map.get(t.priority, 1)
+        # For due_date: if None, treat as very far future
+        date_score = t.due_date if t.due_date else date.max
+        return (prio_score, date_score)
+
+    sorted_tasks = sorted(tasks, key=task_sort_key)[:limit]
 
     return [
         UpcomingTask(
             id=task.id,
             title=task.title,
-            goal_id=goal.id,
-            goal_title=goal.title,
+            goal_id=task.goal_id,
+            goal_title=goal_titles.get(task.goal_id, "Unknown Goal"),
             due_date=task.due_date,
             priority=task.priority,
         )
-        for task, goal in tasks_with_goals
+        for task in sorted_tasks
     ]
 
 

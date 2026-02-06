@@ -11,8 +11,7 @@ from app.config import settings
 class AuthProvider(str, Enum):
     """Authentication provider types."""
     EMAIL = "email"
-    GOOGLE = "google"
-    GITHUB = "github"
+
 
 
 class User(SQLModel, table=True):

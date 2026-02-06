@@ -3,7 +3,7 @@ export interface User {
   email: string;
   name: string;
   avatar_url?: string;
-  auth_provider: 'email' | 'google' | 'github';
+  auth_provider: 'email';
   is_superuser: boolean;
   is_active: boolean;
   created_at: string;

@@ -104,36 +104,7 @@ def create_user(db: Session, data: RegisterRequest) -> User:
     return user
 
 
-def create_oauth_user(
-    db: Session,
-    email: str,
-    name: str,
-    provider: AuthProvider,
-    avatar_url: Optional[str] = None,
-) -> User:
-    """
-    Create a new user from OAuth authentication.
 
-    Args:
-        db: Database session
-        email: User's email from OAuth provider
-        name: User's name from OAuth provider
-        provider: OAuth provider (google, github)
-        avatar_url: Optional profile picture URL
-
-    Returns:
-        Created user object
-    """
-    user = User(
-        email=email,
-        name=name,
-        auth_provider=provider,
-        avatar_url=avatar_url,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:

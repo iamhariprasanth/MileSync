@@ -298,7 +298,7 @@ GOAL_EXTRACTION_TOOL = {
                 },
                 "target_date": {
                     "type": "string",
-                    "description": "Target completion date in YYYY-MM-DD format"
+                    "description": "Target completion date in YYYY-MM-DD format (MUST be in the future, e.g., 2026+)"
                 },
                 "milestones": {
                     "type": "array",
@@ -316,7 +316,7 @@ GOAL_EXTRACTION_TOOL = {
                             },
                             "target_date": {
                                 "type": "string",
-                                "description": "Target date for this milestone in YYYY-MM-DD format"
+                                "description": "Target date for this milestone in YYYY-MM-DD format (MUST be in the future)"
                             },
                             "tasks": {
                                 "type": "array",
@@ -424,6 +424,32 @@ Extract the goal structure using the provided function."""
     if tool_call.function.name != "create_goal_roadmap":
         return None
 
+    def _ensure_future_date(date_str: Optional[str]) -> Optional[str]:
+        """Ensure the date is in the future relative to today."""
+        if not date_str:
+            return None
+        try:
+            # Parse date
+            dt = datetime.strptime(date_str, "%Y-%m-%d").date()
+            today = datetime.utcnow().date()
+            
+            # If date is in the past, bump year until it's in the future
+            if dt < today:
+                # Add years until >= today
+                while dt < today:
+                     # Handle leap years simply by using replace (might fail on Feb 29, so try/except)
+                    try:
+                        dt = dt.replace(year=dt.year + 1)
+                    except ValueError:
+                        # Feb 29 -> Mar 1 next year
+                        dt = dt.replace(year=dt.year + 1, day=1, month=3)
+                
+                return dt.strftime("%Y-%m-%d")
+            
+            return date_str
+        except (ValueError, TypeError):
+            return date_str
+
     try:
         goal_data = json.loads(tool_call.function.arguments)
 
@@ -441,7 +467,7 @@ Extract the goal structure using the provided function."""
             milestones.append(AIMilestoneGeneration(
                 title=m.get("title", ""),
                 description=m.get("description"),
-                target_date=m.get("target_date"),
+                target_date=_ensure_future_date(m.get("target_date")),
                 tasks=tasks,
             ))
 
@@ -449,7 +475,7 @@ Extract the goal structure using the provided function."""
             title=goal_data.get("title", "My Goal"),
             description=goal_data.get("description"),
             category=goal_data.get("category", "other"),
-            target_date=goal_data.get("target_date"),
+            target_date=_ensure_future_date(goal_data.get("target_date")),
             milestones=milestones,
         )
 

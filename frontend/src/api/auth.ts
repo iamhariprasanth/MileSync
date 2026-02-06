@@ -16,10 +16,4 @@ export async function getCurrentUser(): Promise<User> {
   return response.data;
 }
 
-export function getGoogleAuthUrl(): string {
-  return '/api/auth/google';
-}
 
-export function getGitHubAuthUrl(): string {
-  return '/api/auth/github';
-}
