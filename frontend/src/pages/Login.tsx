@@ -90,6 +90,33 @@ export default function Login() {
             </button>
           </form>
 
+          {/* Demo Credentials */}
+          <div className="mt-8 bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <h3 className="text-sm font-semibold text-blue-900 mb-2">Demo Accounts</h3>
+            <div className="space-y-2 text-xs text-blue-800">
+              <div
+                className="flex justify-between items-center bg-white/50 p-2 rounded cursor-pointer hover:bg-white transition-colors"
+                onClick={() => { setEmail('admin@milesync.demo'); setPassword('admin123'); }}
+              >
+                <div>
+                  <div className="font-medium">Admin</div>
+                  <div>admin@milesync.demo / admin123</div>
+                </div>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Click to fill</span>
+              </div>
+              <div
+                className="flex justify-between items-center bg-white/50 p-2 rounded cursor-pointer hover:bg-white transition-colors"
+                onClick={() => { setEmail('user@milesync.demo'); setPassword('user123'); }}
+              >
+                <div>
+                  <div className="font-medium">User</div>
+                  <div>user@milesync.demo / user123</div>
+                </div>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Click to fill</span>
+              </div>
+            </div>
+          </div>
+
           <p className="mt-6 text-center text-sm text-gray-600">
             Don't have an account?{' '}
             <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
