@@ -14,6 +14,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showLimitModal, setShowLimitModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { isListening, startListening, hasSupport } = useSpeechRecognition();
@@ -87,8 +88,12 @@ export default function Chat() {
         response.user_message,
         response.assistant_message,
       ]);
-    } catch (err) {
-      setError('Failed to send message. Please try again.');
+    } catch (err: any) {
+      if (err.response?.status === 429 && err.response?.data?.detail === "OPENAI_LIMIT_REACHED") {
+        setShowLimitModal(true);
+      } else {
+        setError('Failed to send message. Please try again.');
+      }
       // Remove the optimistic message on error
       setMessages((prev) => prev.slice(0, -1));
       console.error('Send message error:', err);
@@ -246,6 +251,32 @@ export default function Chat() {
           </div>
         )}
       </div>
+
+      {/* Limit Reached Modal */}
+      {showLimitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center transform transition-all scale-100">
+            <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3.003L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Usage Limit Reached</h3>
+
+            <p className="text-gray-600 mb-6">
+              You've hit the usage limit for the OpenAI service. Please wait a while before trying again or upgrade your plan for higher limits.
+            </p>
+
+            <button
+              onClick={() => setShowLimitModal(false)}
+              className="w-full py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium transition-colors"
+            >
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

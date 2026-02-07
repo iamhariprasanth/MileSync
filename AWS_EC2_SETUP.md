@@ -111,7 +111,7 @@ git clone https://github.com/iamhariprasanth/MileSync.git .
 cd /var/www/milesync/backend
 
 # Create virtual environment
-python3.11 -m venv venv
+python3.12 -m venv venv
 
 # Activate virtual environment
 source venv/bin/activate
@@ -290,7 +290,7 @@ Add:
 ```nginx
 server {
     listen 80;
-    server_name YOUR_EC2_PUBLIC_IP;  # Or your domain name
+    server_name 3.7.110.104;  # Your EC2 Public IP
 
     # Frontend
     location / {

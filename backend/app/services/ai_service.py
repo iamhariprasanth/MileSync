@@ -8,7 +8,8 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
+from fastapi import HTTPException
 
 from app.config import settings
 from app.schemas.goal import AIGoalGeneration, AIMilestoneGeneration, AITaskGeneration
@@ -166,14 +167,23 @@ async def generate_chat_response(
 
     formatted_messages = format_messages_for_openai(messages)
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=formatted_messages,
-        max_tokens=1000,
-        temperature=0.7,
-    )
-
-    return response.choices[0].message.content or ""
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=formatted_messages,
+            max_tokens=1000,
+            temperature=0.7,
+        )
+        return response.choices[0].message.content or ""
+    except RateLimitError as e:
+        print(f"OpenAI rate limit reached: {e}")
+        raise HTTPException(
+            status_code=429,
+            detail="OPENAI_LIMIT_REACHED"
+        )
+    except Exception as e:
+        print(f"Error generating response: {e}")
+        raise
 
 
 @track(name="generate_chat_response_with_usage", tags=["chat", "ai-coaching", "quota"])
@@ -202,23 +212,33 @@ async def generate_chat_response_with_usage(
 
     formatted_messages = format_messages_for_openai(messages)
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=formatted_messages,
-        max_tokens=1000,
-        temperature=0.7,
-    )
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=formatted_messages,
+            max_tokens=1000,
+            temperature=0.7,
+        )
 
-    # Extract usage information
-    usage = None
-    if response.usage:
-        usage = {
-            "total_tokens": response.usage.total_tokens,
-            "prompt_tokens": response.usage.prompt_tokens,
-            "completion_tokens": response.usage.completion_tokens
-        }
+        # Extract usage information
+        usage = None
+        if response.usage:
+            usage = {
+                "total_tokens": response.usage.total_tokens,
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens
+            }
 
-    return response.choices[0].message.content or "", usage
+        return response.choices[0].message.content or "", usage
+    except RateLimitError as e:
+        print(f"OpenAI rate limit reached: {e}")
+        raise HTTPException(
+            status_code=429,
+            detail="OPENAI_LIMIT_REACHED"
+        )
+    except Exception as e:
+        print(f"Error generating response: {e}")
+        raise
 
 
 def generate_initial_message() -> str:
@@ -255,23 +275,28 @@ async def summarize_conversation(messages: List[dict]) -> str:
     # Build context from messages
     context = "\n".join([f"{m['role']}: {m['content'][:200]}" for m in messages[:5]])
 
-    response = client.chat.completions.create(
-        model=AI_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": "Summarize this goal coaching conversation in 5 words or less. Just return the title, nothing else."
-            },
-            {
-                "role": "user",
-                "content": context
-            }
-        ],
-        max_tokens=20,
-        temperature=0.3,
-    )
-
-    return response.choices[0].message.content or "Goal Discussion"
+    try:
+        response = client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Summarize this goal coaching conversation in 5 words or less. Just return the title, nothing else."
+                },
+                {
+                    "role": "user",
+                    "content": context
+                }
+            ],
+            max_tokens=20,
+            temperature=0.3,
+        )
+        return response.choices[0].message.content or "Goal Discussion"
+    except RateLimitError:
+        # Fallback silently for summarization
+        return "Goal Discussion"
+    except Exception:
+        return "Goal Discussion"
 
 
 # OpenAI tool/function definition for goal extraction
@@ -397,23 +422,33 @@ Extract the goal structure using the provided function."""
     
     system_role = get_system_prompt("goal_extraction_system", "You are a goal extraction assistant. Analyze conversations and extract structured goals.")
 
-    response = client.chat.completions.create(
-        model=AI_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": system_role
-            },
-            {
-                "role": "user",
-                "content": extraction_prompt
-            }
-        ],
-        tools=[GOAL_EXTRACTION_TOOL],
-        tool_choice={"type": "function", "function": {"name": "create_goal_roadmap"}},
-        max_tokens=2000,
-        temperature=0.3,
-    )
+    try:
+        response = client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_role
+                },
+                {
+                    "role": "user",
+                    "content": extraction_prompt
+                }
+            ],
+            tools=[GOAL_EXTRACTION_TOOL],
+            tool_choice={"type": "function", "function": {"name": "create_goal_roadmap"}},
+            max_tokens=2000,
+            temperature=0.3,
+        )
+    except RateLimitError as e:
+        print(f"OpenAI rate limit reached: {e}")
+        raise HTTPException(
+            status_code=429,
+            detail="OPENAI_LIMIT_REACHED"
+        )
+    except Exception as e:
+        print(f"Error extracting goal: {e}")
+        return None
 
     # Extract the function call arguments
     message = response.choices[0].message

@@ -10,6 +10,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
+import openai
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -162,6 +164,12 @@ class BaseAgent(ABC):
                 temperature=0.7
             )
             return response.choices[0].message.content
+        except openai.RateLimitError as e:
+            self.logger.error(f"OpenAI rate limit reached: {e}")
+            raise HTTPException(
+                status_code=429,
+                detail="OPENAI_LIMIT_REACHED"
+            )
         except Exception as e:
             self.logger.error(f"Error generating response: {e}")
             raise
