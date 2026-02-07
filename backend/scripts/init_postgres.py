@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlmodel import Session, select
 from app.database import engine, create_db_and_tables
 from app.models.user import User
-from app.services.auth_service import get_password_hash
+from app.services.auth_service import hash_password
 
 
 def init_database():
@@ -34,7 +34,7 @@ def init_database():
             admin = User(
                 email="admin@milesync.demo",
                 name="Admin",
-                hashed_password=get_password_hash("admin123"),
+                password_hash=hash_password("admin123"),
                 is_active=True,
                 is_superuser=True,
             )
@@ -52,7 +52,7 @@ def init_database():
             user = User(
                 email="user@milesync.demo",
                 name="Super User",
-                hashed_password=get_password_hash("user123"),
+                password_hash=hash_password("user123"),
                 is_active=True,
                 is_superuser=False,
             )
